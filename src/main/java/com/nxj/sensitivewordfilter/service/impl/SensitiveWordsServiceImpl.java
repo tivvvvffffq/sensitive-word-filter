@@ -17,11 +17,11 @@ public class SensitiveWordsServiceImpl implements SensitiveWordsService {
 
     @Resource
     private SensitiveWordsMapper sensitiveWordsMapper;
-
     private Trie trie;
+    private Map<String, Set<String>> partToOriginalWordsMap; // 存储敏感词各部分到原始组合敏感词的映射
+    private Map<String, Set<String>> originalWordToPartsMap; // 存储原始组合敏感词到其组成部分的映射
     private Set<String> normalSensitiveWords; // 存储普通敏感词
-    private Set<String> combinedSensitiveWords; // 存储组合敏感词
-    private Map<String, String> combinedWordParts; // 存储组合敏感词的各部分
+    private Set<String> combinedSensitiveWords; // 存储原本的组合敏感词
 
     // 初始化服务，加载敏感词并构建 Trie
     @PostConstruct
@@ -30,7 +30,9 @@ public class SensitiveWordsServiceImpl implements SensitiveWordsService {
         normalSensitiveWords = new HashSet<>();
         combinedSensitiveWords = new HashSet<>();
         // 初始化存储组合敏感词各部分与完整词的映射关系的哈希表
-        combinedWordParts = new HashMap<>();
+        partToOriginalWordsMap = new HashMap<>();
+        originalWordToPartsMap = new HashMap<>();
+
         // 从数据库中获取所有敏感词
         List<SensitiveWords> sensitiveWords = sensitiveWordsMapper.selectAll();
 
@@ -42,14 +44,15 @@ public class SensitiveWordsServiceImpl implements SensitiveWordsService {
                 builder.addKeyword(word.getWord());
                 normalSensitiveWords.add(word.getWord());
             } else if (word.getType() == 1) { // 处理组合敏感词
+                combinedSensitiveWords.add(word.getWord());
                 // 分割组合敏感词为单独的部分
                 String[] parts = word.getWord().split(",");
                 for (String part : parts) {
                     // 将每个部分添加到 Trie 构建器中
-                    builder.addKeyword(part.trim());
-                    // 记录组合敏感词及其组成部分
-                    combinedSensitiveWords.add(word.getWord());
-                    combinedWordParts.put(part.trim(), word.getWord());
+                    part = part.trim();
+                    builder.addKeyword(part);
+                    partToOriginalWordsMap.computeIfAbsent(part, k -> new HashSet<>()).add(word.getWord());
+                    originalWordToPartsMap.computeIfAbsent(word.getWord(), k -> new HashSet<>()).add(part);
                 }
             }
         }
@@ -73,32 +76,30 @@ public class SensitiveWordsServiceImpl implements SensitiveWordsService {
     public Collection<SensitiveWordsResult> findSensitiveWords(String text) {
         Collection<Emit> emits = trie.parseText(text);
         List<SensitiveWordsResult> results = new ArrayList<>();
-        Set<String> addedCombinedWords = new HashSet<>(); // 用于存储已添加的组合敏感词
-
-        // 遍历所有找到的敏感词
+        // 用于临时存储和检查组合敏感词的部分是否全部出现
+        Map<String, Set<String>> tempOriginalWordToPartsMap = new HashMap<>();
         for (Emit emit : emits) {
-            // 获取匹配到的敏感词文本
             String foundWord = emit.getKeyword();
-
-            // 如果找到的词是组合敏感词的一部分
-            if (combinedWordParts.containsKey(foundWord)) {
-                // 获取组合敏感词的原始形式
-                String originalCombinedWord = combinedWordParts.get(foundWord);
-                // 检查是否已经添加了这个组合敏感词
-                if (!addedCombinedWords.contains(originalCombinedWord)) {
-                    // 添加到结果中，并标记为已添加
-                    results.add(new SensitiveWordsResult(originalCombinedWord, 1));
-                    addedCombinedWords.add(originalCombinedWord);
-                }
-            } else {
-                // 如果不是组合敏感词的一部分，类型设置为 0（普通敏感词）
+            if (normalSensitiveWords.contains(foundWord)) {
                 results.add(new SensitiveWordsResult(foundWord, 0));
+            } else if (partToOriginalWordsMap.containsKey(foundWord.trim())) {
+                foundWord = foundWord.trim();
+                Set<String> originSet = partToOriginalWordsMap.get(foundWord);
+                for (String originalWord : originSet) {
+                    // 深拷贝部分，确保不直接修改原始的映射
+                    tempOriginalWordToPartsMap.computeIfAbsent(originalWord, k -> new HashSet<>(originalWordToPartsMap.get(k))).remove(foundWord);
+                    // 检查是否所有部分都已经匹配
+                    if (tempOriginalWordToPartsMap.get(originalWord).isEmpty()) {
+                        results.add(new SensitiveWordsResult(originalWord, 1));
+                        // 移除已经匹配的组合敏感词，防止重复添加
+                        tempOriginalWordToPartsMap.remove(originalWord);
+                    }
+                }
             }
         }
-
-        // 返回检测到的所有敏感词及其类型
         return results;
     }
+
 
     // 向数据库添加新的敏感词，并更新 Trie
     @Override
@@ -108,9 +109,13 @@ public class SensitiveWordsServiceImpl implements SensitiveWordsService {
             normalSensitiveWords.add(sensitiveWord.getWord());
         } else if (sensitiveWord.getType() == 1) {
             String[] parts = sensitiveWord.getWord().split(",");
+            combinedSensitiveWords.add(sensitiveWord.getWord());
             for (String part : parts) {
-                combinedSensitiveWords.add(sensitiveWord.getWord());
-                combinedWordParts.put(part.trim(), sensitiveWord.getWord());
+                part = part.trim();
+                // 更新 part 到原始组合词的映射
+                partToOriginalWordsMap.computeIfAbsent(part, k -> new HashSet<>()).add(sensitiveWord.getWord());
+                // 更新原始组合词到其部分的映射
+                originalWordToPartsMap.computeIfAbsent(sensitiveWord.getWord(), k -> new HashSet<>()).add(part);
             }
         }
         rebuildTrie();
@@ -121,13 +126,26 @@ public class SensitiveWordsServiceImpl implements SensitiveWordsService {
     public void deleteSensitiveWord(SensitiveWords sensitiveWord) {
         sensitiveWordsMapper.delete(sensitiveWord.getId());
         if (sensitiveWord.getType() == 0) {
+            // 从普通敏感词集合中移除
             normalSensitiveWords.remove(sensitiveWord.getWord());
         } else if (sensitiveWord.getType() == 1) {
+            // 从组合敏感词集合中移除
+            combinedSensitiveWords.remove(sensitiveWord.getWord());
             String[] parts = sensitiveWord.getWord().split(",");
             for (String part : parts) {
-                combinedSensitiveWords.remove(sensitiveWord.getWord());
-                combinedWordParts.remove(part.trim());
+                part = part.trim();
+                // 从部分到原始组合词的映射中移除相关条目
+                Set<String> originalWords = partToOriginalWordsMap.get(part);
+                if (originalWords != null) {
+                    originalWords.remove(sensitiveWord.getWord());
+                    // 如果某个部分不再映射到任何组合敏感词，可以考虑从映射中完全移除这个部分
+                    if (originalWords.isEmpty()) {
+                        partToOriginalWordsMap.remove(part);
+                    }
+                }
             }
+            // 从原始组合词到其部分的映射中移除条目
+            originalWordToPartsMap.remove(sensitiveWord.getWord());
         }
         rebuildTrie();
     }
