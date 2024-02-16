@@ -1,4 +1,4 @@
-package com.nxj.sensitivewordfilter.Config;
+package com.nxj.sensitivewordfilter.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

@@ -1,9 +1,8 @@
 package com.nxj.sensitivewordfilter.controller;
 
-import com.nxj.sensitivewordfilter.service.SensitiveWordService;
+import com.nxj.sensitivewordfilter.model.SensitiveWordsResult;
+import com.nxj.sensitivewordfilter.service.SensitiveWordsService;
 import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
-import org.ahocorasick.trie.Emit;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -16,14 +15,14 @@ import java.util.Collection;
 @Api
 @RestController
 @RequestMapping("/api/sensitive")
-public class SensitiveWordController {
+public class SensitiveWordsController {
 
     @Resource
-    private SensitiveWordService sensitiveWordService;
+    private SensitiveWordsService sensitiveWordsService;
 
     @PostMapping("/match")
     public ResponseEntity<?> matchSensitiveWords(@RequestBody String text) {
-        Collection<Emit> tokens = sensitiveWordService.findSensitiveWords(text);
+        Collection<SensitiveWordsResult> tokens = sensitiveWordsService.findSensitiveWords(text);
         return ResponseEntity.ok(tokens);
     }
 }
