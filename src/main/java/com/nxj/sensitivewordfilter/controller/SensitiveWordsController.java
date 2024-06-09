@@ -14,7 +14,7 @@ import java.util.Collection;
 
 @Api
 @RestController
-@RequestMapping("/api/sensitive")
+@RequestMapping("/sensitive")
 public class SensitiveWordsController {
 
     @Resource
