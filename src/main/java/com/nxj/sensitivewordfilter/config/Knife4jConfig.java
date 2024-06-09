@@ -19,9 +19,9 @@ public class Knife4jConfig {
                 .apiInfo(new ApiInfoBuilder()
                         //.title("swagger-bootstrap-ui-demo RESTful APIs")
                         .description("敏感词匹配中间件接口文档")
-                        .termsOfServiceUrl("http://www.xxx.com/")
-                        .contact(new Contact("nxj", "http://www.sensitive-word-filter.com/", "abc@163.com"))
-                        .version("1.0")
+                        .termsOfServiceUrl("http://www.nxj.com/")
+                        .contact(new Contact("nxj", "http://www.sensitive-word-filter.com/", "nxj@163.com"))
+                        .version("2.0")
                         .build())
                 //分组名称
                 .groupName("2.X版本")

@@ -18,6 +18,7 @@ public class SensitiveWordsServiceImpl implements SensitiveWordsService {
     private SensitiveWordsMapper sensitiveWordsMapper;
     private ACAuto comboAutomaton;
     private ACAuto singleAutomaton;
+    private Set<String> comboWords;
 
     // 初始化服务，加载敏感词
     @PostConstruct
@@ -26,7 +27,7 @@ public class SensitiveWordsServiceImpl implements SensitiveWordsService {
         singleAutomaton = new ACAuto(); // 用于普通敏感词的自动机
         // 初始化组合敏感词自动机
         List<SensitiveWords> sensitiveWords = sensitiveWordsMapper.selectAll();
-        Set<String> comboWords = new HashSet<>();
+        comboWords = new HashSet<>();
         for(SensitiveWords words: sensitiveWords) {
             if(words.getType() == 0) {
                 singleAutomaton.insert(words.getWord());
@@ -56,12 +57,14 @@ public class SensitiveWordsServiceImpl implements SensitiveWordsService {
     // 向数据库添加新的敏感词，并更新 Trie
     @Override
     public void addSensitiveWord(SensitiveWords sensitiveWord) {
-
+        sensitiveWordsMapper.insert(sensitiveWord);
+        if(sensitiveWord.getType() == 0) {
+            singleAutomaton.insert(sensitiveWord.getWord());
+            singleAutomaton.buildFailurePointers();
+        }else if(sensitiveWord.getType() == 1) {
+            comboWords.add(sensitiveWord.getWord());
+            comboAutomaton.initialize(comboWords);
+        }
     }
 
-    // 从数据库中删除敏感词，并更新 Trie
-    @Override
-    public void deleteSensitiveWord(SensitiveWords sensitiveWord) {
-
-    }
 }

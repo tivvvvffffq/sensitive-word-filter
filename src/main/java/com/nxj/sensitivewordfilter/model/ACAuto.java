@@ -2,6 +2,9 @@ package com.nxj.sensitivewordfilter.model;
 
 import java.util.*;
 
+/**
+ * 自实现AC自动机
+ */
 public class ACAuto {
     private ACNode root;
     private Map<String, List<String>> comboWordToParts; // 组合敏感词到其组成部分的映射

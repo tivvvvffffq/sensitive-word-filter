@@ -9,6 +9,5 @@ public interface SensitiveWordsService {
 
     Collection<SensitiveWordsResult> findSensitiveWords(String text);
     void addSensitiveWord(SensitiveWords sensitiveWords);
-    void deleteSensitiveWord(SensitiveWords sensitiveWords);
 
 }

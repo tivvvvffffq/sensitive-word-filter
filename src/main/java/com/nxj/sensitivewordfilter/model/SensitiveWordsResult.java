@@ -1,5 +1,8 @@
 package com.nxj.sensitivewordfilter.model;
 
+/**
+ * 查询结果
+ */
 public class SensitiveWordsResult {
     private String word;
     private int type; // 0: 普通敏感词, 1: 组合敏感词

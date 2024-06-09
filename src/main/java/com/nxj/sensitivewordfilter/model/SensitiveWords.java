@@ -2,11 +2,14 @@ package com.nxj.sensitivewordfilter.model;
 
 import java.util.Date;
 
+/**
+ * 敏感词
+ */
 public class SensitiveWords {
     private Integer id;
     private String word;
     private Integer categoryId;
-    private Integer type;
+    private Integer type; // 0: 普通敏感词, 1: 组合敏感词
     private Integer isDeleted;
     private Date addedTime;
 
